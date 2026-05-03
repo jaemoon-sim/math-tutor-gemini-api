@@ -13,6 +13,7 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field, HttpUrl
@@ -23,6 +24,8 @@ load_dotenv()
 APP_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = APP_DIR.parent
 DEFAULT_CURRICULUM_DIR = PROJECT_ROOT / "curriculum"
+SAMPLES_DIR = PROJECT_ROOT / "samples"
+WEB_DIR = PROJECT_ROOT / "web"
 
 DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_BYTES", str(10 * 1024 * 1024)))
@@ -80,6 +83,12 @@ class SolveResponse(BaseModel):
     raw_text: str | None = None
 
 
+class SampleLevel(BaseModel):
+    id: str
+    name: str
+    markdown: str
+
+
 app = FastAPI(
     title="Math Tutor Gemini API",
     description="이미지 URL 또는 업로드 파일과 학생 진도 Markdown을 받아 Gemini로 수학 문제를 풀이합니다.",
@@ -104,6 +113,24 @@ async def health() -> dict[str, Any]:
         "curriculum_dir": str(DEFAULT_CURRICULUM_DIR),
         "curriculum_files": [str(path) for path in find_curriculum_files()],
     }
+
+
+@app.get("/sample-levels", response_model=list[SampleLevel])
+async def sample_levels() -> list[SampleLevel]:
+    if not SAMPLES_DIR.exists():
+        return []
+
+    levels = []
+    for path in sorted(SAMPLES_DIR.glob("*-student-level.md")):
+        markdown = path.read_text(encoding="utf-8")
+        levels.append(
+            SampleLevel(
+                id=path.stem,
+                name=humanize_sample_name(path.stem),
+                markdown=markdown,
+            )
+        )
+    return levels
 
 
 @app.post("/solve", response_model=SolveResponse)
@@ -198,6 +225,14 @@ def find_curriculum_files() -> list[Path]:
     if not DEFAULT_CURRICULUM_DIR.exists():
         return []
     return sorted(DEFAULT_CURRICULUM_DIR.glob("*.md"))
+
+
+def humanize_sample_name(stem: str) -> str:
+    names = {
+        "middle-2-student-level": "중2 - 피타고라스 정리까지",
+        "high-3-student-level": "고3 - 미적분/기하 이수",
+    }
+    return names.get(stem, stem.replace("-", " "))
 
 
 async def download_image(image_url: str) -> dict[str, Any]:
@@ -390,3 +425,7 @@ def parse_gemini_response(response: Any) -> GeminiMathSolution | dict[str, Any]:
             "missing_concepts": [],
             "recommended_review_units": [],
         }
+
+
+if WEB_DIR.exists():
+    app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")

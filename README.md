@@ -19,6 +19,14 @@ cp .env.example .env
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
+웹 데모는 같은 서버에서 열린다.
+
+```text
+http://127.0.0.1:8000/
+```
+
+데모 화면에서는 진도현황을 저장하고, 저장된 진도현황을 선택한 뒤, 이미지 파일을 업로드해 `/solve-form`으로 풀이를 요청한다. 진도현황은 브라우저 `localStorage`에 저장된다.
+
 ## Health Check
 
 ```bash
