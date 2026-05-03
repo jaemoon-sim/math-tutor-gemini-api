@@ -25,6 +25,8 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 curl http://127.0.0.1:8000/health
 ```
 
+기본 교육과정 맥락은 `curriculum/*.md` 파일을 파일명 순서대로 합쳐서 Gemini 프롬프트에 넣는다. 특정 요청에서 `curriculum_md`를 직접 보내면 그 값을 우선 사용한다.
+
 ## 문제 풀이 요청
 
 ```bash

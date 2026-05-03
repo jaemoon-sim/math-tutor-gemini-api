@@ -22,7 +22,7 @@ load_dotenv()
 
 APP_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = APP_DIR.parent
-DEFAULT_CURRICULUM_PATH = PROJECT_ROOT / "curriculum" / "2022-middle-school-math.md"
+DEFAULT_CURRICULUM_DIR = PROJECT_ROOT / "curriculum"
 
 DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_BYTES", str(10 * 1024 * 1024)))
@@ -101,8 +101,8 @@ async def health() -> dict[str, Any]:
         "ok": True,
         "model": DEFAULT_MODEL,
         "has_gemini_api_key": bool(os.getenv("GEMINI_API_KEY")),
-        "curriculum_path": str(DEFAULT_CURRICULUM_PATH),
-        "has_default_curriculum": DEFAULT_CURRICULUM_PATH.exists(),
+        "curriculum_dir": str(DEFAULT_CURRICULUM_DIR),
+        "curriculum_files": [str(path) for path in find_curriculum_files()],
     }
 
 
@@ -182,12 +182,22 @@ async def solve_form(
 
 
 def load_default_curriculum() -> str:
-    if not DEFAULT_CURRICULUM_PATH.exists():
+    paths = find_curriculum_files()
+    if not paths:
         raise HTTPException(
             status_code=500,
-            detail=f"기본 교육과정 파일을 찾을 수 없습니다: {DEFAULT_CURRICULUM_PATH}",
+            detail=f"기본 교육과정 파일을 찾을 수 없습니다: {DEFAULT_CURRICULUM_DIR}",
         )
-    return DEFAULT_CURRICULUM_PATH.read_text(encoding="utf-8")
+    sections = []
+    for path in paths:
+        sections.append(f"<!-- source: {path.name} -->\n\n{path.read_text(encoding='utf-8')}")
+    return "\n\n---\n\n".join(sections)
+
+
+def find_curriculum_files() -> list[Path]:
+    if not DEFAULT_CURRICULUM_DIR.exists():
+        return []
+    return sorted(DEFAULT_CURRICULUM_DIR.glob("*.md"))
 
 
 async def download_image(image_url: str) -> dict[str, Any]:
